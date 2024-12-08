@@ -46,7 +46,6 @@ const queries = {
     }),
     getCurrentUser: (parent, args, ctx) => __awaiter(void 0, void 0, void 0, function* () {
         var _b;
-        console.log(ctx);
         const id = (_b = ctx.user) === null || _b === void 0 ? void 0 : _b.id;
         if (!id)
             return null;
@@ -60,7 +59,8 @@ const queries = {
             console.log(error);
         }
         return user;
-    })
+    }),
+    getUserById: (parent_2, _c, ctx_1) => __awaiter(void 0, [parent_2, _c, ctx_1], void 0, function* (parent, { id }, ctx) { return db_1.prismaClient.user.findUnique({ where: { id } }); })
 };
 const extraResolvers = {
     User: {
