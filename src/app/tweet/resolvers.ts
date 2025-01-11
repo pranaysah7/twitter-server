@@ -4,21 +4,16 @@ import { prismaClient } from "../../client/db"
 import { GraphqlContext } from "../../interfaces"
 import { S3Client ,PutObjectCommand} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-interface CreateTweetData{
-    content:string
-    imageUrl?:string
+import UserService from "../../services/user";
+import TweetService, { CreateTweetData } from "../../services/tweet";
 
-}
-const s3Client = new S3Client(
-  {
-    region:"ap-south-1",
-    credentials:{accessKeyId:"AKIA5G2VGHXYKBPDZWWP",
-    secretAccessKey:"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"},
-  }
-)
+const s3Client = new S3Client({
+  region:process.env.AWS_DEFAULT_REGION
+});
 const queries={
-    getAllTweets:()=>
-        prismaClient.tweet.findMany({orderBy:{createdAt:"desc"}}),
+        getAllTweets:()=>
+        TweetService.getAllTweets(),
+
         getSignedUrlForTweet: async(parent:any,{imageName,imageType}:{imageName:string,imageType:string},ctx:GraphqlContext)=>{
           console.log(ctx.user);
             if(!ctx.user || !ctx.user.id) throw new Error("Unauthenticated");
@@ -32,7 +27,7 @@ const queries={
             if(!allowedImageTypes.includes(imageType))
               throw new Error("Unsupported Image type");
             const putObjectCommand = new PutObjectCommand({
-              Bucket: 'pranaytwitter',
+              Bucket: process.env.AWS_S3_BUCKET,
               Key: `uploads/${ctx.user.id}/tweets/${imageName}-${Date.now()}.${imageType}`,
             })
             const signedUrl=await getSignedUrl(s3Client,putObjectCommand);
@@ -44,13 +39,10 @@ const mutations = {
       if (!ctx.user) throw new Error("You are not Authenticated!");
   
       try {
-        const tweet = await prismaClient.tweet.create({
-          data: {
-            content: payload.content,
-            imageUrl: payload.imageUrl,
-            author: { connect: { id: ctx.user.id } },
-          },
-        });
+        const tweet = await TweetService.createTweet({
+          ...payload,
+          userId:ctx.user.id
+        })
         return tweet;
       } catch (error) {
         console.error("Error creating tweet:", error);
@@ -62,7 +54,7 @@ const mutations = {
   const extraResolvers={
     Tweet:{
         author:(parent:Tweet)=>
-        prismaClient.user.findUnique({where:{id:parent.authorId}})
+        UserService.getUserById(parent.authorId)
     }
   }
 export const resolvers={mutations,extraResolvers,queries}
