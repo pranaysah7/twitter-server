@@ -9,5 +9,7 @@ export const types=`#graphql
 
         following: [User]
         followers: [User]
+
+        recommendedUsers:[User]
     }
 `

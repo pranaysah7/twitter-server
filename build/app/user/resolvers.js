@@ -47,6 +47,28 @@ const extraResolvers = {
         following: (parent) => __awaiter(void 0, void 0, void 0, function* () {
             const result = yield db_1.prismaClient.follows.findMany({ where: { follower: { id: parent.id } }, include: { following: true } });
             return (result).map(el => el.following);
+        }),
+        recommendedUsers: (parent, _, ctx) => __awaiter(void 0, void 0, void 0, function* () {
+            if (!ctx.user)
+                return [];
+            const myFollowings = yield db_1.prismaClient.follows.findMany({
+                where: {
+                    follower: { id: ctx.user.id },
+                },
+                include: {
+                    following: { include: { followers: { include: { following: true } } } }
+                }
+            });
+            const users = [];
+            for (const followings of myFollowings) {
+                for (const followingOfFollowedUser of followings.following.followers) {
+                    if (followingOfFollowedUser.following.id !== ctx.user.id && myFollowings.findIndex(e => e.followingId === followingOfFollowedUser.following.id) < 0) {
+                        users.push(followingOfFollowedUser.following);
+                    }
+                }
+            }
+            console.log(myFollowings);
+            return users;
         })
     }
 };
