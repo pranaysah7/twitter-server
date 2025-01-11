@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolvers = void 0;
 const db_1 = require("../../client/db");
 const user_1 = __importDefault(require("../../services/user"));
+const redis_1 = require("../../client/redis");
 const queries = {
     verifyGoogleToken: (parent_1, _a) => __awaiter(void 0, [parent_1, _a], void 0, function* (parent, { token }) {
         return yield user_1.default.verifyGoogleAuthToken(token);
@@ -51,6 +52,9 @@ const extraResolvers = {
         recommendedUsers: (parent, _, ctx) => __awaiter(void 0, void 0, void 0, function* () {
             if (!ctx.user)
                 return [];
+            const cachedValue = yield redis_1.redisClient.get(`RECOMMENDED_USERS:${ctx.user.id}`);
+            if (cachedValue)
+                return JSON.parse(cachedValue);
             const myFollowings = yield db_1.prismaClient.follows.findMany({
                 where: {
                     follower: { id: ctx.user.id },
@@ -67,7 +71,7 @@ const extraResolvers = {
                     }
                 }
             }
-            console.log(myFollowings);
+            yield redis_1.redisClient.setex(`RECOMMENDED_USERS:${ctx.user.id}`, 10, JSON.stringify(users));
             return users;
         })
     }
@@ -77,12 +81,14 @@ const mutations = {
         if (!ctx.user || !ctx.user.id)
             throw new Error("Unauthenticated");
         yield user_1.default.followUser(ctx.user.id, to);
+        yield redis_1.redisClient.del(`RECOMMENDED_USERS:${ctx.user.id}`);
         return true;
     }),
     unFollowUser: (parent_4, _e, ctx_3) => __awaiter(void 0, [parent_4, _e, ctx_3], void 0, function* (parent, { to }, ctx) {
         if (!ctx.user || !ctx.user.id)
             throw new Error("Unauthenticated");
         yield user_1.default.unFollowUser(ctx.user.id, to);
+        yield redis_1.redisClient.del(`RECOMMENDED_USERS:${ctx.user.id}`);
         return true;
     })
 };
